@@ -621,9 +621,11 @@ class _HomePageState extends State<HomePage> {
       for (final entry in position.legalMoves.entries)
         for (final dest in entry.value.squares)
           NormalMove(from: entry.key, to: dest)
+          
     ];
     if (allMoves.isNotEmpty) {
       NormalMove mv = (allMoves..shuffle()).first;
+      pgn += ' ${_moveToPgn(mv)}';
       // Auto promote to a random non-pawn role
       if (isPromotionPawnMove(mv)) {
         final potentialRoles =
@@ -631,6 +633,7 @@ class _HomePageState extends State<HomePage> {
         final role = potentialRoles[random.nextInt(potentialRoles.length)];
         mv = mv.withPromotion(role);
       }
+
 
       setState(() {
         position = position.playUnchecked(mv);

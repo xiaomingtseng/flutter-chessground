@@ -76,6 +76,8 @@ class _HomePageState extends State<HomePage> {
   Position? lastPos;
   ISet<Shape> shapes = ISet();
   bool showBorder = false;
+  int moveCount = 0;
+  String pgn = '';
 
   void _resetGame() {
     setState(() {
@@ -88,6 +90,8 @@ class _HomePageState extends State<HomePage> {
       sideToMove = Side.white;
       lastPos = null;
       shapes = ISet();
+      moveCount = 0;
+      pgn = ''; // 重置 PGN
     });
   }
 
@@ -264,65 +268,73 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
       drawer: Drawer(
-          child: ListView(
-        children: [
-          ListTile(
-            title: const Text('Random Bot'),
-            onTap: () {
-              setState(() {
-                playMode = Mode.botPlay;
-              });
-              if (position.turn == Side.black) {
-                _playBlackMove();
-              }
-              Navigator.pop(context);
-            },
-          ),
-          ListTile(
-            title: const Text('Enter opponent move'),
-            onTap: () {
-              setState(() {
-                playMode = Mode.inputMove;
-              });
-              Navigator.pop(context);
-            },
-          ),
-          ListTile(
-            title: const Text('Free Play'),
-            onTap: () {
-              setState(() {
-                playMode = Mode.freePlay;
-              });
-              Navigator.pop(context);
-            },
-          ),
-          ListTile(
-            title: const Text('Board Editor'),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const BoardEditorPage(),
-                ),
-              );
-            },
-          ),
-          ListTile(
-            title: const Text('Board Thumbnails'),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const BoardThumbnailsPage(),
-                ),
-              );
-            },
-          ),
-        ],
-      )),
+        child: ListView(
+          children: [
+            ListTile(
+              title: const Text('Random Bot'),
+              onTap: () {
+                setState(() {
+                  playMode = Mode.botPlay;
+                  _resetGame(); // Reset the game when switching to botPlay mode
+                });
+                if (position.turn == Side.black) {
+                  _playBlackMove();
+                }
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              title: const Text('Enter opponent move'),
+              onTap: () {
+                setState(() {
+                  playMode = Mode.inputMove;
+                  _resetGame(); // Reset the game when switching to inputMove mode
+                });
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              title: const Text('Free Play'),
+              onTap: () {
+                setState(() {
+                  playMode = Mode.freePlay;
+                  _resetGame(); // Reset the game when switching to freePlay mode
+                });
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              title: const Text('Board Editor'),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const BoardEditorPage(),
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              title: const Text('Board Thumbnails'),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const BoardThumbnailsPage(),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
       body: Column(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text(pgn, style: const TextStyle(fontSize: 18)),
+          ),
           Chessboard(
             size: screenWidth,
             settings: ChessboardSettings(
@@ -486,6 +498,7 @@ class _HomePageState extends State<HomePage> {
       });
     } else if (position.isLegal(move)) {
       setState(() {
+        pgn += ' ${_moveToPgn(move)}';
         position = position.playUnchecked(move);
         lastMove = move;
         fen = position.fen;
@@ -494,7 +507,9 @@ class _HomePageState extends State<HomePage> {
         if (isPremove == true) {
           premove = null;
         }
+        moveCount++;
       });
+      _checkGameOver();
     }
   }
 
@@ -506,15 +521,92 @@ class _HomePageState extends State<HomePage> {
       });
     } else {
       setState(() {
+        pgn += ' ${_moveToPgn(move)}';
         position = position.playUnchecked(move);
         lastMove = move;
         fen = position.fen;
         validMoves = IMap(const {});
         promotionMove = null;
+        moveCount++;
       });
       await _playBlackMove();
       _tryPlayPremove();
+      _checkGameOver();
     }
+  }
+
+  void _checkGameOver() {
+    if (position.isGameOver) {
+      String result;
+      if (position.isCheckmate) {
+        result = position.turn == Side.white
+            ? 'Black wins by checkmate'
+            : 'White wins by checkmate';
+      } else if (position.isStalemate) {
+        result = 'Draw by stalemate';
+      } else if (position.isInsufficientMaterial) {
+        result = 'Draw by insufficient material';
+      } else {
+        result = 'Draw';
+      }
+
+      showDialog<void>(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('Game Over'),
+            content: Text(result),
+            actions: <Widget>[
+              TextButton(
+                child: const Text('Play Again'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _resetGame();
+                },
+              ),
+            ],
+          );
+        },
+      );
+    }
+  }
+
+  String _moveToPgn(NormalMove move) {
+    final moveNumber = (moveCount ~/ 2) + 1;
+    final isWhiteMove = moveCount % 2 == 0;
+    final movePrefix = isWhiteMove ? '$moveNumber. ' : '';
+
+    if (_isKingsideCastle(move)) {
+      return '$movePrefix O-O';
+    } else if (_isQueensideCastle(move)) {
+      return '$movePrefix O-O-O';
+    }
+
+    final piece = position.board.pieceAt(move.from);
+    final pieceChar = piece != null && piece.role != Role.pawn
+        ? piece.role.uppercaseLetter
+        : '';
+    final capture = position.board.pieceAt(move.to) != null ? 'x' : '';
+    final promotion =
+        move.promotion != null ? '=${move.promotion!.uppercaseLetter}' : '';
+    if (piece != null && piece.role == Role.pawn) {
+      final fromFile = capture.isNotEmpty ? move.from.file.name : '';
+      return '$movePrefix$fromFile$capture${move.to.name}$promotion';
+    } else {
+      return '$movePrefix$pieceChar$capture${move.to.name}$promotion';
+    }
+  }
+
+  bool _isKingsideCastle(NormalMove move) {
+    // Assuming standard chess rules
+    return (move.from == Square.e1 && move.to == Square.g1) ||
+        (move.from == Square.e8 && move.to == Square.g8);
+  }
+
+  bool _isQueensideCastle(NormalMove move) {
+    // Assuming standard chess rules
+    return (move.from == Square.e1 && move.to == Square.c1) ||
+        (move.from == Square.e8 && move.to == Square.c8);
   }
 
   Future<void> _playBlackMove() async {
@@ -529,9 +621,11 @@ class _HomePageState extends State<HomePage> {
       for (final entry in position.legalMoves.entries)
         for (final dest in entry.value.squares)
           NormalMove(from: entry.key, to: dest)
+          
     ];
     if (allMoves.isNotEmpty) {
       NormalMove mv = (allMoves..shuffle()).first;
+      pgn += ' ${_moveToPgn(mv)}';
       // Auto promote to a random non-pawn role
       if (isPromotionPawnMove(mv)) {
         final potentialRoles =
@@ -539,6 +633,7 @@ class _HomePageState extends State<HomePage> {
         final role = potentialRoles[random.nextInt(potentialRoles.length)];
         mv = mv.withPromotion(role);
       }
+
 
       setState(() {
         position = position.playUnchecked(mv);

@@ -62,3 +62,4 @@ flutter:
 
   assets:
     - lib/piece_set/maestro/
+    - assets/

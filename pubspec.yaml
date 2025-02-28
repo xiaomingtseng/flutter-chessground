@@ -24,6 +24,7 @@ dev_dependencies:
 
 flutter:
   assets:
+    - assets/move_sound.mp3
     - assets/piece_sets/alpha/
     - assets/piece_sets/anarcandy/
     - assets/piece_sets/california/

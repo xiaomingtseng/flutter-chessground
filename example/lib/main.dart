@@ -89,13 +89,14 @@ class _HomePageState extends State<HomePage> {
     _audioPlayer.setReleaseMode(ReleaseMode.loop);
     await _audioPlayer.play(AssetSource(soundName));
     }
-    Future<void> _playSoundEffect(String soundName) async {
+  Future<void> _playSoundEffect(String soundName) async {
       _audioPlayer.setVolume(0.3);
       await _audioPlayer.play(AssetSource(soundName));
-    }
+  }
 
     //播放音效
-    _playSoundEffect('move_sound.mp3');
+    
+   
 
 
   void _resetGame() {
@@ -113,6 +114,7 @@ class _HomePageState extends State<HomePage> {
       currentPgnIndex = 0;
       pgn = ''; // 重置 PGN
     });
+     _audioPlayer.play(AssetSource('move_sound.mp3'));
   }
 
   @override
@@ -483,6 +485,7 @@ class _HomePageState extends State<HomePage> {
         _playMove(premove!, isPremove: true);
       });
     }
+    _audioPlayer.play(AssetSource('move_sound.mp3'));
   }
 
   void _onCompleteShape(Shape shape) {
@@ -540,7 +543,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     validMoves = makeLegalMoves(position);
     super.initState();
-     _playSoundEffect('move_sound.mp3');
+     _audioPlayer.play(AssetSource('move_sound.mp3'));
   }
 
   void _onSetPremove(NormalMove? move) {
@@ -588,20 +591,14 @@ class _HomePageState extends State<HomePage> {
       });
       _checkGameOver();
 
-      // Play move sound
-      Future<void> _playSoundEffect(String soundName) async {
-        _audioPlayer.setVolume(1.0);
-        await _audioPlayer.play(AssetSource(soundName));
-      }
-
-      //播放音效
-      _playSoundEffect('move_sound.mp3');
+      _audioPlayer.play(AssetSource('move_sound.mp3'));
 
     }
   }
 
   void _onUserMoveAgainstBot(NormalMove move, {isDrop}) async {
     lastPos = position;
+    _audioPlayer.play(AssetSource('move_sound.mp3'));
     if (isPromotionPawnMove(move)) {
       setState(() {
         promotionMove = move;
@@ -702,7 +699,7 @@ class _HomePageState extends State<HomePage> {
       setState(() {});
     });
     if (position.isGameOver) return;
-
+    _audioPlayer.play(AssetSource('move_sound.mp3'));
     final random = Random();
     await Future.delayed(Duration(milliseconds: random.nextInt(1000) + 500));
     final allMoves = [

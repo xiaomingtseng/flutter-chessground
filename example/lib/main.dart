@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:chessground/chessground.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:dartchess/dartchess.dart';
-
+import 'package:audioplayers/audioplayers.dart';
 import 'board_theme.dart';
 import 'board_thumbnails.dart';
 
@@ -57,6 +57,9 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  int currentPgnIndex = 0;
+
   Position position = Chess.initial;
   Side orientation = Side.white;
   String fen = kInitialBoardFEN;
@@ -79,6 +82,22 @@ class _HomePageState extends State<HomePage> {
   int moveCount = 0;
   String pgn = '';
 
+
+
+  Future<void> _playBackGroundMusic(String soundName) async {
+    _audioPlayer.setVolume(0.2);
+    _audioPlayer.setReleaseMode(ReleaseMode.loop);
+    await _audioPlayer.play(AssetSource(soundName));
+    }
+    Future<void> _playSoundEffect(String soundName) async {
+      _audioPlayer.setVolume(0.3);
+      await _audioPlayer.play(AssetSource(soundName));
+    }
+
+    //播放音效
+    _playSoundEffect('move_sound.mp3');
+
+
   void _resetGame() {
     setState(() {
       position = Chess.initial;
@@ -91,6 +110,7 @@ class _HomePageState extends State<HomePage> {
       lastPos = null;
       shapes = ISet();
       moveCount = 0;
+      currentPgnIndex = 0;
       pgn = ''; // 重置 PGN
     });
   }
@@ -253,6 +273,9 @@ class _HomePageState extends State<HomePage> {
       ),
     ];
 
+    final pgnMoves = pgn.toString().trim().split(' ');
+    final displayedPgn = _getDisplayedPgn(pgnMoves, 10);
+
     return Scaffold(
       appBar: AppBar(
         title: switch (playMode) {
@@ -333,7 +356,7 @@ class _HomePageState extends State<HomePage> {
         children: [
           Padding(
             padding: const EdgeInsets.all(8.0),
-            child: Text(pgn, style: const TextStyle(fontSize: 18)),
+            child: Text(displayedPgn, style: const TextStyle(fontSize: 18)),
           ),
           Chessboard(
             size: screenWidth,
@@ -391,6 +414,47 @@ class _HomePageState extends State<HomePage> {
             ),
             shapes: shapes.isNotEmpty ? shapes : null,
           ),
+          // Row(
+          //   mainAxisAlignment: MainAxisAlignment.center,
+          //   children: [
+          //       IconButton(
+          //       icon: const Icon(Icons.first_page),
+          //       onPressed: () {
+          //         setState(() {
+          //         currentPgnIndex = 0;
+          //         _updatePositionFromPgn();
+          //         });
+          //       },
+          //       ),
+          //       IconButton(
+          //       icon: const Icon(Icons.chevron_left),
+          //       onPressed: () {
+          //         setState(() {
+          //         currentPgnIndex = (currentPgnIndex - 1).clamp(0, pgnMoves.length - 1);
+          //         _updatePositionFromPgn();
+          //         });
+          //       },
+          //       ),
+          //       IconButton(
+          //       icon: const Icon(Icons.chevron_right),
+          //       onPressed: () {
+          //         setState(() {
+          //         currentPgnIndex = (currentPgnIndex + 1).clamp(0, pgnMoves.length - 1);
+          //         _updatePositionFromPgn();
+          //         });
+          //       },
+          //       ),
+          //       IconButton(
+          //       icon: const Icon(Icons.last_page),
+          //       onPressed: () {
+          //         setState(() {
+          //         currentPgnIndex = (pgnMoves.length - 1).clamp(0, pgnMoves.length - 1);
+          //         _updatePositionFromPgn();
+          //         });
+          //       },
+          //     ),
+          //   ],
+          // ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children:
@@ -399,6 +463,18 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
     );
+  }
+
+  String _getDisplayedPgn(List<String> pgnMoves, int count) {
+    final buffer = StringBuffer();
+    final startIndex = pgnMoves.length > count ? pgnMoves.length - count : 0;
+    if (startIndex > 0) {
+      buffer.write('... ');
+    }
+    for (int i = startIndex; i < pgnMoves.length; i++) {
+      buffer.write('${pgnMoves[i]} ');
+    }
+    return buffer.toString().trim();
   }
 
   void _tryPlayPremove() {
@@ -464,6 +540,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     validMoves = makeLegalMoves(position);
     super.initState();
+     _playSoundEffect('move_sound.mp3');
   }
 
   void _onSetPremove(NormalMove? move) {
@@ -510,6 +587,16 @@ class _HomePageState extends State<HomePage> {
         moveCount++;
       });
       _checkGameOver();
+
+      // Play move sound
+      Future<void> _playSoundEffect(String soundName) async {
+        _audioPlayer.setVolume(1.0);
+        await _audioPlayer.play(AssetSource(soundName));
+      }
+
+      //播放音效
+      _playSoundEffect('move_sound.mp3');
+
     }
   }
 
@@ -570,11 +657,12 @@ class _HomePageState extends State<HomePage> {
       );
     }
   }
-
+  
   String _moveToPgn(NormalMove move) {
-    final moveNumber = (moveCount ~/ 2) + 1;
     final isWhiteMove = moveCount % 2 == 0;
+    final moveNumber = (moveCount ~/ 2) + (isWhiteMove ? 1 : 0);
     final movePrefix = isWhiteMove ? '$moveNumber. ' : '';
+    final checker = position.checkers.isNotEmpty ? '' : '';
 
     if (_isKingsideCastle(move)) {
       return '$movePrefix O-O';
@@ -591,9 +679,9 @@ class _HomePageState extends State<HomePage> {
         move.promotion != null ? '=${move.promotion!.uppercaseLetter}' : '';
     if (piece != null && piece.role == Role.pawn) {
       final fromFile = capture.isNotEmpty ? move.from.file.name : '';
-      return '$movePrefix$fromFile$capture${move.to.name}$promotion';
+      return '$movePrefix$fromFile$capture${move.to.name}$promotion$checker';
     } else {
-      return '$movePrefix$pieceChar$capture${move.to.name}$promotion';
+      return '$movePrefix$pieceChar$capture${move.to.name}$promotion$checker';
     }
   }
 
@@ -621,11 +709,11 @@ class _HomePageState extends State<HomePage> {
       for (final entry in position.legalMoves.entries)
         for (final dest in entry.value.squares)
           NormalMove(from: entry.key, to: dest)
-          
     ];
     if (allMoves.isNotEmpty) {
       NormalMove mv = (allMoves..shuffle()).first;
       pgn += ' ${_moveToPgn(mv)}';
+      moveCount++;
       // Auto promote to a random non-pawn role
       if (isPromotionPawnMove(mv)) {
         final potentialRoles =
@@ -634,15 +722,17 @@ class _HomePageState extends State<HomePage> {
         mv = mv.withPromotion(role);
       }
 
-
       setState(() {
         position = position.playUnchecked(mv);
-        lastMove =
-            NormalMove(from: mv.from, to: mv.to, promotion: mv.promotion);
+        lastMove = NormalMove(from: mv.from, to: mv.to, promotion: mv.promotion);
         fen = position.fen;
         validMoves = makeLegalMoves(position);
       });
       lastPos = position;
+
+      // Play move sound
+      // _audioPlayer.play('assets/move_sound.mp3', isLocal: true, volume: 1.0, stayAwake: true);
+      
     }
   }
 
@@ -652,6 +742,22 @@ class _HomePageState extends State<HomePage> {
         ((move.to.rank == Rank.first && position.turn == Side.black) ||
             (move.to.rank == Rank.eighth && position.turn == Side.white));
   }
+
+  // void _updatePositionFromPgn() {
+  //   final moves = pgn.split(' ');
+  //   position = Chess.initial;
+  //   for (int i = 0; i < currentPgnIndex && i < moves.length; i++) {
+  //     if (moves[i].contains('.')) continue; // Skip move numbers
+  //     final move = NormalMove.fromUci(moves[i]);
+  //     position = position.playUnchecked(move);
+  //   }
+  //   fen = position.fen;
+  //   validMoves = makeLegalMoves(position);
+  //   lastMove = null;
+  //   promotionMove = null;
+  //   premove = null;
+  //   shapes = ISet();
+  // }
 }
 
 Color _darken(Color c, [double amount = .1]) {

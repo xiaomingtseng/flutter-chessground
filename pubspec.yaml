@@ -10,6 +10,7 @@ environment:
   flutter: ">=3.29.0-0.3"
 
 dependencies:
+  audioplayers: ^6.2.0
   dartchess: ^0.10.0
   fast_immutable_collections: ^11.0.0
   flutter:
